@@ -1,6 +1,5 @@
 package com.example.jigis.postcreatefirebase;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Camera;
@@ -18,6 +17,7 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.net.wifi.aware.Characteristics;
 import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
@@ -61,7 +61,7 @@ public class PostActivity extends AppCompatActivity {
     //front camera
     public static final String CAMERA_FRONT = "1";
     public static final String CAMERA_BACK = "0";
-    Camera cameraid= null;
+
 
     private String cameraId = CAMERA_BACK;
     /**
@@ -160,21 +160,34 @@ public class PostActivity extends AppCompatActivity {
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void switchCamera() {
 
-        CameraManager manager = (CameraManager) this.getSystemService(Context.CAMERA_SERVICE);
-        getFrontFacingCameraId(manager);
-         /*   for (String cameraId : manager.getCameraIdList()) {
-                Log.d("camera id ", "findCameraIds: CAMERA ID: " + cameraId);
-                if (cameraId == null) continue;
-                CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
-                Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
-                if ( facing == CameraCharacteristics.LENS_FACING_FRONT) {
-                    continue;
-                    }
-                else if (facing == CameraCharacteristics.LENS_FACING_BACK) {
-                continue;
-                }
-            }*/
+//        mCameraOpenCloseLock.release();
+        cameraDevice.close();
 
+        CameraManager mCameraManager = (CameraManager) this.getSystemService(Context.CAMERA_SERVICE);
+        try {
+            cameraId = mCameraManager.getCameraIdList()[0];
+            Log.d("camera","camera id "+cameraId);
+            if (cameraId.equals("0")) {   // If currently on FRONT camera (0 = CameraCharacteristics.LENS_FACING_FRONT)
+                cameraId = "1";           // switch to BACK camera (1 = CameraCharacteristics.LENS_FACING_BACK)
+                Log.d("back id","front back"+cameraId.toString());
+                btnfrontcamera.setImageResource(R.drawable.ic_camera_front_black_24dp);
+            } else if (cameraId.equals("1")){  // If currently on BACK camera
+                cameraId = "0"; // switch to front camera
+                Log.d("front id","back front "+cameraId.toString());
+                btnfrontcamera.setImageResource(R.drawable.ic_camera_rear_black_24dp);
+            }
+            try {
+                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    mCameraManager.openCamera(cameraId, stateCallback, null);
+                }
+            } catch (CameraAccessException e) {
+                e.printStackTrace();
+            }
+        } catch (CameraAccessException e) {
+            Toast.makeText(this, "Cannot access the camera.", Toast.LENGTH_SHORT).show();
+            finish();
+        }
 
     }
 
@@ -367,15 +380,25 @@ public class PostActivity extends AppCompatActivity {
     private void openCamera() {
         CameraManager manager = (CameraManager)getSystemService(Context.CAMERA_SERVICE);
         try{
-            cameraId = manager.getCameraIdList()[0];
+//            cameraId = manager.getCameraIdList()[0];
+
+/*
+            String mCameraId = manager.getCameraIdList()[0];
+            if (mCameraId.equals("0")) {   // If currently on FRONT camera (0 = CameraCharacteristics.LENS_FACING_FRONT)
+                cameraId = "1";           // switch to BACK camera (1 = CameraCharacteristics.LENS_FACING_BACK)
+                btnfrontcamera.setImageResource(R.drawable.ic_camera_front_black_24dp);
+            } else {  // If currently on BACK camera
+                cameraId = "0"; // switch to front camera
+                btnfrontcamera.setImageResource(R.drawable.ic_camera_rear_black_24dp);
+            }
+*/
+
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
             Toast.makeText(getApplicationContext(), "Front Camera"+manager+""+cameraId, Toast.LENGTH_SHORT).show();
-
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             assert map != null;
             imageDimension = map.getOutputSizes(SurfaceTexture.class)[0];
             //Check realtime permission if run higher API 23
-
             if(ActivityCompat.checkSelfPermission(this,android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
             {
                 ActivityCompat.requestPermissions(this,new String[]{
@@ -462,19 +485,26 @@ public class PostActivity extends AppCompatActivity {
         mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
     }
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    String getFrontFacingCameraId(CameraManager cManager){
+    boolean getFrontFacingCameraId(CameraManager cManager){
         try {
-            for (final String cameraId : cManager.getCameraIdList()) {
-                CameraCharacteristics characteristics;
-                Toast.makeText(getApplicationContext(), "Front Camera"+cManager+""+cameraId, Toast.LENGTH_SHORT).show();
-                characteristics = cManager.getCameraCharacteristics(cameraId);
-                int cOrientation = characteristics.get(CameraCharacteristics.LENS_FACING);
-                if (cOrientation == CameraCharacteristics.LENS_FACING_FRONT) return cameraId;
-            }
+//            for (final String cameraId : cManager.getCameraIdList()) {
+//                CameraCharacteristics characteristics;
+//            cameraId = cManager.getCameraIdList()[1];
+            CameraCharacteristics cameraCharacteristics = cManager.getCameraCharacteristics(cameraId);
+            Toast.makeText(getApplicationContext(), "Front Camera"+cManager+""+cameraId, Toast.LENGTH_SHORT).show();
+////                characteristics = cManager.getCameraCharacteristics(cameraId);
+//                int cOrientation = characteristics.get(CameraCharacteristics.LENS_FACING);
+//                if (cOrientation == CameraCharacteristics.LENS_FACING_FRONT) return cameraId;
+            if (cameraCharacteristics == null)
+                throw new NullPointerException("No camera with id " + cameraId);
+
+            return cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT;
+
+//            }
         }
         catch (CameraAccessException e) {
             e.printStackTrace();
         }
-        return null;
+        return true;
     }
 }
